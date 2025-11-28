@@ -1,8 +1,6 @@
 #Requires AutoHotkey 2.0
 #SingleInstance Force
 
-DEBUG := false ; set to true for tooltip button state debugging
-
 ; Tested on:
 ; Edition       Windows 11 Home
 ; Version       24H2
@@ -49,39 +47,15 @@ DEBUG := false ; set to true for tooltip button state debugging
 
 ; Courtesy of Lexikos from https://www.autohotkey.com/boards/viewtopic.php?t=106254
 Loop {
-  tt := ''
+  state := XInputState(0)
 
-  if (!state := XInputState(0)) {
-    MsgBox 'No controller found; exiting...'
-
-    ExitApp
-  } else {
-    tt .= state.wButtons
-
-    if (WinExist("Run Steam?") and state) {
-      switch state.wButtons {
-        case "4096": ; "A" button (oversimplified)
-          ControlClick("Button1", "Run Steam?")
-        case "8192": ; "B" button (oversimplified)
-          ControlClick("Button2", "Run Steam?")
-      }
-    }
-  }
+  tt := CheckController(state)
 
   tt .= "..."
 
-;  if (WinExist("ahk_exe OpenWith.exe", "ms-gamebar")) { ; this should work, but it doesn't
-  if (WinExist("Pick an app")) {
-    tt .= " ms-gamebar window exists"
-    WinClose("Pick an app")
-;    WinClose("ahk_exe OpenWith.exe", "ms-gamebar") ; this should work, but it doesn't
-  } else {
-    tt .= " ms-gamebar window does not exist"
-  }
+  tt .= KillMsGamebarPopups()
 
-  if (DEBUG) {
-    ToolTip tt
-  }
+  PrintDebug(state, tt)
 
   sleep 100
 }
@@ -98,6 +72,52 @@ XInputState(UserIndex) {
 
   return {
     wButtons: NumGet(xiState,  4, "UShort")
+  }
+}
+
+CheckController(state) {
+  if (!state) {
+    return ''
+  } else {
+    if (WinExist("Run Steam?") and state) {
+      switch state.wButtons {
+        case "4096": ; "A" button (oversimplified)
+          ControlClick("Button1", "Run Steam?")
+        case "8192": ; "B" button (oversimplified)
+          ControlClick("Button2", "Run Steam?")
+      }
+    }
+
+    return state.wButtons
+  }
+}
+
+KillMsGamebarPopups() {
+  tt := ''
+
+  if (WinExist("Pick an app")) { ; if (WinExist("ahk_exe OpenWith.exe", "ms-gamebar")) { ; this should work, but it doesn't; FIXME: figure this out
+    tt .= " ms-gamebar window exists"
+    WinClose("Pick an app") ; WinClose("ahk_exe OpenWith.exe", "ms-gamebar") ; this should work, but it doesn't; FIXME: figure this out
+  } else {
+    tt .= " ms-gamebar window does not exist"
+  }
+
+  return tt
+}
+
+PrintDebug(state, tt) {
+  static debug := false
+
+  if (!state) {
+    return
+  } else if (state.wButtons = "62256") { ; all face buttons and shoulder buttons = toggle debug mode
+    debug := !debug
+  }
+
+  if (debug) {
+    ToolTip(tt)
+  } else {
+    ToolTip()
   }
 }
 
@@ -136,7 +156,7 @@ SteamButton() {
     ; Steam has launched a game with the Overlay enabled
     ; FIXME: unfortuantely I still haven't figured out how to get this to consistently trigger the Overlay
     ; FIXME: this presses shift+tab in, say, Notepad, but it's ignored by Steam while a game is in the foreground, unless you spam the button
-    ; workaround: map another button to press shift+tab in order to raise the Overlay
+    ; temporary workaround: map another controller button (or chord) to press shift+tab in order to raise the Overlay
 ;    Send "+{Tab}"
 ;    Send "{Blind}+{Tab}"
 ;    SendInput "+{Tab}"
